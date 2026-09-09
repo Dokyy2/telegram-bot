@@ -6,7 +6,7 @@ import os
 import threading
 import sys
 
-TOKEN = "8654184216:AAGHSSJTMkKwDYx571UphYM95pX50hcf8os"
+TOKEN = "8480571070:AAEDtWj2FYMASkDfpRBCUp1aD7kBK-mr32k"
 MY_CHAT_ID = 1674108077
 
 is_recording = False
