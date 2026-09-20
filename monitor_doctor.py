@@ -8,18 +8,6 @@ import sys
 from dataclasses import dataclass
 
 
-TERMUX_PROGRAMS = (
-    "termux-battery-status",
-    "termux-wifi-connectioninfo",
-    "termux-volume",
-    "termux-camera-photo",
-    "termux-microphone-record",
-    "termux-sms-list",
-    "termux-call-log",
-    "termux-location",
-    "termux-screenshot"
-)
-
 SYSTEM_PROGRAMS = (
     "uptime",
 )
