@@ -12,10 +12,18 @@ TERMUX_PROGRAMS = (
     "termux-battery-status",
     "termux-wifi-connectioninfo",
     "termux-volume",
+    "termux-camera-photo",
+    "termux-microphone-record",
+    "termux-sms-list",
+    "termux-call-log",
+    "termux-location",
+    "termux-screenshot"
 )
+
 SYSTEM_PROGRAMS = (
     "uptime",
 )
+
 REQUIRED_CONFIG = ("TOKEN", "MY_CHAT_ID")
 
 
@@ -28,6 +36,7 @@ class CheckResult:
 
 def run_checks() -> list[CheckResult]:
     results: list[CheckResult] = []
+    
     missing_programs = [program for program in TERMUX_PROGRAMS if shutil.which(program) is None]
     results.append(
         CheckResult(
@@ -38,6 +47,7 @@ def run_checks() -> list[CheckResult]:
             else f"الناقص: {', '.join(missing_programs)}. ثبّت حزمة termux-api أولًا.",
         )
     )
+    
     missing_system_programs = [program for program in SYSTEM_PROGRAMS if shutil.which(program) is None]
     results.append(
         CheckResult(
