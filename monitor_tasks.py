@@ -116,25 +116,25 @@ def call_logs_report(limit: int = 10) -> str:
             
         report = f"📱 *سجل آخر {limit} مكالمة:*\n" + "—" * 20 + "\n\n"
         for idx, call in enumerate(reversed(calls), start=1):
-            # سحب الاسم والرقم وتحويلهما إلى نصوص نظيفة
-            name = str(call.get('name') or "").strip()
-            number = str(call.get('number') or "").strip()
+            raw_name = str(call.get('name') or "").strip()
+            raw_number = str(call.get('number') or "").strip()
             
-            # مسح أي كلمات إنجليزية افتراضية من النظام
-            if name.lower() in ['unknown', 'unknown caller', 'null', 'none', '']:
-                name = ""
-            if number.lower() in ['unknown', 'unknown caller', 'null', 'none', '']:
-                number = ""
+            # مسح الكلمات الإنجليزية والأرقام السالبة الافتراضية
+            ignore_list = ['unknown', 'unknown caller', 'null', 'none', '-1']
+            if raw_name.lower() in ignore_list:
+                raw_name = ""
+            if raw_number.lower() in ignore_list:
+                raw_number = ""
                 
-            # تحديد طريقة العرض بناءً على البيانات المتاحة
-            if name and number and name != number:
-                display_info = f"{name} ({number})"
-            elif number:
-                display_info = f"{number}"
-            elif name:
-                display_info = f"{name}"
+            # منطق العرض: الأولوية للرقم دائماً
+            if raw_name and raw_number and raw_name != raw_number:
+                display_info = f"{raw_name} ({raw_number})"
+            elif raw_number:
+                display_info = f"{raw_number}"
+            elif raw_name:
+                display_info = f"{raw_name}"
             else:
-                display_info = "رقم خاص (مخفي)"
+                display_info = "رقم غير مسجل"
             
             call_type = call.get('type', '')
             date = call.get('date', '')
