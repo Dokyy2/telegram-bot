@@ -117,8 +117,13 @@ def call_logs_report(limit: int = 10) -> str:
         report = f"📱 *سجل آخر {limit} مكالمة:*\n" + "—" * 20 + "\n\n"
         for idx, call in enumerate(reversed(calls), start=1):
             name = call.get('name', '').strip()
-            number = call.get('number', '')
-            display_info = f"{name} ({number})" if name else f"{number}"
+            number = call.get('number', 'رقم غير معروف')
+            
+            # التعديل: فحص وتجاهل الأسماء الافتراضية للأرقام غير المسجلة
+            if not name or name.lower() in ['unknown', 'unknown caller', 'null']:
+                display_info = f"{number}"
+            else:
+                display_info = f"{name} ({number})"
             
             call_type = call.get('type', '')
             date = call.get('date', '')
