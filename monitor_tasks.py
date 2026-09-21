@@ -117,16 +117,15 @@ def call_logs_report(limit: int = 10) -> str:
         report = f"📱 *سجل آخر {limit} مكالمة:*\n" + "—" * 20 + "\n\n"
         for idx, call in enumerate(reversed(calls), start=1):
             raw_name = str(call.get('name') or "").strip()
-            raw_number = str(call.get('number') or "").strip()
+            # التعديل هنا: قراءة الحقل الصحيح الجديد phone_number بدلاً من number
+            raw_number = str(call.get('phone_number') or call.get('number') or "").strip()
             
-            # مسح الكلمات الإنجليزية والأرقام السالبة الافتراضية
             ignore_list = ['unknown', 'unknown caller', 'null', 'none', '-1']
             if raw_name.lower() in ignore_list:
                 raw_name = ""
             if raw_number.lower() in ignore_list:
                 raw_number = ""
                 
-            # منطق العرض: الأولوية للرقم دائماً
             if raw_name and raw_number and raw_name != raw_number:
                 display_info = f"{raw_name} ({raw_number})"
             elif raw_number:
