@@ -5,3 +5,4 @@ venv/
 .env
 config.py
 monitor.log
+monitor.log

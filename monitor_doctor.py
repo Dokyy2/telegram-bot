@@ -7,6 +7,17 @@ import shutil
 import sys
 from dataclasses import dataclass
 
+# وضعنا القائمة هنا وحذفنا منها لقطة الشاشة فقط
+TERMUX_PROGRAMS = (
+    "termux-battery-status",
+    "termux-wifi-connectioninfo",
+    "termux-volume",
+    "termux-camera-photo",
+    "termux-microphone-record",
+    "termux-sms-list",
+    "termux-call-log",
+    "termux-location"
+)
 
 SYSTEM_PROGRAMS = (
     "uptime",
