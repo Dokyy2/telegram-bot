@@ -4,10 +4,10 @@
 """
 
 # أنشئ Bot منفصلًا لكل هاتف إذا كانت الأجهزة تستقبل الأوامر من Telegram مباشرة.
-TOKEN = "8883607265:AAF9AGQnjKMwtcfBfjauY40jjgj-4sLqlSw"
+TOKEN = "8665902490:AAEoqotKRl2jgwHh2uNKkt3q-TGjwStxZoQ"
 
 # رقم محادثة Telegram المسموح لها بالتعامل مع هذا الجهاز فقط.
 MY_CHAT_ID = 1674108077
 
 # اسم واضح يميّز هذا الهاتف في رسائل الحالة.
-DEVICE_NAME = "Ayty"
+DEVICE_NAME = "EMAN"
